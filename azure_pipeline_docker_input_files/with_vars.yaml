@@ -1,62 +1,72 @@
+# Define the variables for the files to be copied to the containers
 variables:
-  functionApp1Name: 'functionapp1'
-  functionApp1Files: 'file1.txt'
-  functionApp2Name: 'functionapp2'
-  functionApp2Files: 'file2.txt'
-  dockerImageName: 'mydockerimage'
-  dockerRegistry: 'mydockerregistry.azurecr.io'
+  functionApp1Files: './functionApp1Files/*'
+  functionApp2Files: './functionApp2Files/*'
 
+# Define the build stage of the pipeline
 stages:
-- stage: build
+- stage: Build
+  displayName: Build image
   jobs:
-  - job: build_job
+  - job: BuildDockerImage
+    displayName: Build Docker image
     pool:
       vmImage: 'ubuntu-latest'
     steps:
     - task: Docker@2
+      displayName: Build Docker image
       inputs:
-        containerRegistry: $(dockerRegistry)
-        repository: $(dockerImageName)
         command: 'build'
-        Dockerfile: '**/Dockerfile'
-        buildContext: '**'
-        tags: |
-          $(Build.BuildId)
-- stage: deploy
+        dockerfile: '**/Dockerfile'
+        tags: 'myimage:$(Build.BuildId)'
+
+# Define the deploy stage of the pipeline
+- stage: Deploy
+  displayName: Deploy to function apps
   jobs:
-  - job: deploy_job
+  - job: DeployFunctionApp1
+    displayName: Deploy to Function App 1
     pool:
       vmImage: 'ubuntu-latest'
     steps:
-    - task: AzureFunctionApp@1
-      inputs:
-        azureSubscription: 'myAzureSubscription'
-        appType: 'functionAppLinux'
-        appName: $(functionApp1Name)
-        dockerImageName: '$(dockerRegistry)/$(dockerImageName):$(Build.BuildId)'
-        startupCommand: ''
-        environment: 'AzureCloud'
-        appSettings: ''
+    # Copy the files to the container for Function App 1
     - task: Docker@2
+      displayName: Copy files to container for Function App 1
       inputs:
-        containerRegistry: $(dockerRegistry)
-        repository: $(dockerImageName)
-        command: 'run'
+        containerRegistry: 'myregistry'
+        repository: 'myimage:$(Build.BuildId)'
+        command: '/bin/bash'
         arguments: '/bin/bash -c "cp $(functionApp1Files) /app && /azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost"'
-        detached: false
+        containerCommand: '/azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost'
+        ports: '80'
+    # Deploy the container to Function App 1
     - task: AzureFunctionApp@1
+      displayName: Deploy container to Function App 1
       inputs:
-        azureSubscription: 'myAzureSubscription'
+        azureSubscription: 'mySubscription'
         appType: 'functionAppLinux'
-        appName: $(functionApp2Name)
-        dockerImageName: '$(dockerRegistry)/$(dockerImageName):$(Build.BuildId)'
-        startupCommand: ''
-        environment: 'AzureCloud'
-        appSettings: ''
+        appName: 'myFunctionApp1'
+        package: '$(System.ArtifactsDirectory)/drop/$(Build.BuildId).zip'
+  - job: DeployFunctionApp2
+    displayName: Deploy to Function App 2
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    # Copy the files to the container for Function App 2
     - task: Docker@2
+      displayName: Copy files to container for Function App 2
       inputs:
-        containerRegistry: $(dockerRegistry)
-        repository: $(dockerImageName)
-        command: 'run'
+        containerRegistry: 'myregistry'
+        repository: 'myimage:$(Build.BuildId)'
+        command: '/bin/bash'
         arguments: '/bin/bash -c "cp $(functionApp2Files) /app && /azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost"'
-        detached: false
+        containerCommand: '/azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost'
+        ports: '80'
+    # Deploy the container to Function App 2
+    - task: AzureFunctionApp@1
+      displayName: Deploy container to Function App 2
+      inputs:
+        azureSubscription: 'mySubscription'
+        appType: 'functionAppLinux'
+        appName: 'myFunctionApp2'
+        package: '$(System.ArtifactsDirectory)/drop/$(Build.BuildId).zip'
