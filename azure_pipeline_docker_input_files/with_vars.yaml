@@ -1,0 +1,62 @@
+variables:
+  functionApp1Name: 'functionapp1'
+  functionApp1Files: 'file1.txt'
+  functionApp2Name: 'functionapp2'
+  functionApp2Files: 'file2.txt'
+  dockerImageName: 'mydockerimage'
+  dockerRegistry: 'mydockerregistry.azurecr.io'
+
+stages:
+- stage: build
+  jobs:
+  - job: build_job
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: Docker@2
+      inputs:
+        containerRegistry: $(dockerRegistry)
+        repository: $(dockerImageName)
+        command: 'build'
+        Dockerfile: '**/Dockerfile'
+        buildContext: '**'
+        tags: |
+          $(Build.BuildId)
+- stage: deploy
+  jobs:
+  - job: deploy_job
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: AzureFunctionApp@1
+      inputs:
+        azureSubscription: 'myAzureSubscription'
+        appType: 'functionAppLinux'
+        appName: $(functionApp1Name)
+        dockerImageName: '$(dockerRegistry)/$(dockerImageName):$(Build.BuildId)'
+        startupCommand: ''
+        environment: 'AzureCloud'
+        appSettings: ''
+    - task: Docker@2
+      inputs:
+        containerRegistry: $(dockerRegistry)
+        repository: $(dockerImageName)
+        command: 'run'
+        arguments: '/bin/bash -c "cp $(functionApp1Files) /app && /azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost"'
+        detached: false
+    - task: AzureFunctionApp@1
+      inputs:
+        azureSubscription: 'myAzureSubscription'
+        appType: 'functionAppLinux'
+        appName: $(functionApp2Name)
+        dockerImageName: '$(dockerRegistry)/$(dockerImageName):$(Build.BuildId)'
+        startupCommand: ''
+        environment: 'AzureCloud'
+        appSettings: ''
+    - task: Docker@2
+      inputs:
+        containerRegistry: $(dockerRegistry)
+        repository: $(dockerImageName)
+        command: 'run'
+        arguments: '/bin/bash -c "cp $(functionApp2Files) /app && /azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost"'
+        detached: false

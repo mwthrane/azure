@@ -1,0 +1,68 @@
+trigger:
+- main
+
+variables:
+  # Azure Container Registry information
+  ACR_NAME: <your-acr-name>
+  ACR_RESOURCE_GROUP: <your-acr-resource-group>
+  ACR_LOGIN_SERVER: <your-acr-login-server>
+  ACR_USERNAME: $ACR_NAME
+  IMAGE_NAME: <your-image-name>
+  IMAGE_TAG: '$(Build.BuildNumber)'
+  DOCKERFILE_PATH: <path-to-your-dockerfile>
+
+steps:
+# Build the Docker image
+- task: Docker@2
+  displayName: Build Docker image
+  inputs:
+    command: build
+    dockerfile: $(DOCKERFILE_PATH)
+    buildContext: .
+    arguments: '--build-arg FUNCTION_APP_PACKAGE_NAME=functionapp.zip -t $(ACR_LOGIN_SERVER)/$(IMAGE_NAME):$(IMAGE_TAG)'
+    containerRegistry: $(ACR_LOGIN_SERVER)
+    tags: |
+      $(ACR_LOGIN_SERVER)/$(IMAGE_NAME):$(IMAGE_TAG)
+    displayName: Build image
+
+# Deploy the Docker image to function app 1
+- task: AzureFunctionApp@1
+  displayName: Deploy Docker container to function app 1
+  inputs:
+    azureSubscription: <your-azure-subscription>
+    appName: <your-function-app-name-1>
+    imageName: $(ACR_LOGIN_SERVER)/$(IMAGE_NAME)
+    imageTag: $(IMAGE_TAG)
+    restartAppDuringDeployment: true
+    useAppSettings: false
+  # Copy files to the Docker image for function app 1
+  - task: CopyFiles@2
+    displayName: Copy files to Docker image for function app 1
+    inputs:
+      SourceFolder: <path-to-files-for-app-1>
+      Contents: |
+        function_files_1
+        function_files_2
+      TargetFolder: /app
+      OverWrite: true
+
+# Deploy the Docker image to function app 2
+- task: AzureFunctionApp@1
+  displayName: Deploy Docker container to function app 2
+  inputs:
+    azureSubscription: <your-azure-subscription>
+    appName: <your-function-app-name-2>
+    imageName: $(ACR_LOGIN_SERVER)/$(IMAGE_NAME)
+    imageTag: $(IMAGE_TAG)
+    restartAppDuringDeployment: true
+    useAppSettings: false
+  # Copy files to the Docker image for function app 2
+  - task: CopyFiles@2
+    displayName: Copy files to Docker image for function app 2
+    inputs:
+      SourceFolder: <path-to-files-for-app-2>
+      Contents: |
+        function_files_3
+        function_files_4
+      TargetFolder: /app
+      OverWrite: true
