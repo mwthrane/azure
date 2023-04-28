@@ -20,7 +20,7 @@ stages:
         dockerfile: '**/Dockerfile'
         tags: 'myimage:$(Build.BuildId)'
 
-# Define the deploy stage of the pipeline
+## Define the deploy stage of the pipeline
 - stage: Deploy
   displayName: Deploy to function apps
   jobs:
