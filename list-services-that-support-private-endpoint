@@ -1,0 +1,1 @@
+az network private-link resource list --ids $(az group show -n <resource-group-name> --query id --output tsv) --query [].{name:name, type:type} --output table
